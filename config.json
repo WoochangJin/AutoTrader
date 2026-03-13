@@ -1,0 +1,14 @@
+{
+    "strategy": {
+        "name": "MultiMaFilterStrategy",
+        "params": {
+            "ma_windows": [5, 20, 60, 200],
+            "rsi_buy_level": 35.5,
+            "rsi_sell_level": 75.0,
+            "vol_ma_window": 20,
+            "vol_threshold_factor": 1.8,
+            "stop_loss_pct": -5.0,
+            "trailing_stop_pct": 3.5
+        }
+    }
+}
