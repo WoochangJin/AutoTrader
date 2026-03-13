@@ -1,38 +1,43 @@
 import requests
 import json
-import pandas as pd
 
 class KISOverseas:
     def __init__(self, auth):
         self.auth = auth
         self.base_url = auth.base_url
 
-    def get_overseas_daily_ohlcv(self, symbol, end_date):
+    def get_overseas_daily_ohlcv(self, symbol, end_date, excd="NAS"):
         """
-        미국 주식 일봉 데이터 조회
+        미국 주식 일봉 데이터 조회 (HHDFS00000300)
         """
-        path = "/uapi/overseas-stock/v1/quotations/dailyprice"
+        path = "/uapi/overseas-price/v1/quotations/dailyprice" # 하이픈 확인
         url = f"{self.base_url}{path}"
         
-        # auth 객체에서 미리 만들어둔 헤더를 가져옵니다.
         headers = self.auth.auth_headers
         headers.update({
-            "tr_id": "HHDFS00000300" 
+            "tr_id": "HHDFS76240000" 
         })
         
         params = {
             "AUTH": "",
-            "EXCD": "NAS",  # SOXL은 나스닥(NAS) 종목입니다.
+            "EXCD": excd, 
             "SYMB": symbol,
-            "GUBN": "0",    # 0: 일봉
+            "GUBN": "0", 
             "BYMD": end_date,
             "MODP": "1"
         }
         
-        response = requests.get(url, headers=headers, params=params)
+        res = requests.get(url, headers=headers, params=params)
         
-        if response.status_code == 200:
-            return response.json()
+        print(f"DEBUG: 상태 코드 = {res.status_code}")
+        
+        if res.status_code == 200:
+            data = res.json()
+            # 서버가 보낸 전체 데이터를 일단 다 찍어봅니다.
+            print(f"DEBUG: 서버 응답 전체 데이터 -> {json.dumps(data, indent=2, ensure_ascii=False)}")
+            
+            # 데이터가 output2에 있는지, 아니면 다른 곳에 있는지 확인 루프
+            return data.get('output2', [])
         else:
-            print(f"Error: {response.status_code}, {response.text}")
+            print(f"❌ 시세 조회 실패 상세: {res.status_code} - {res.text}")
             return None
