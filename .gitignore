@@ -1,4 +1,5 @@
 # --- Security & Credentials ---
+.token.json
 .env
 *.pem
 *.key
