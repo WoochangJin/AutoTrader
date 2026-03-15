@@ -24,6 +24,7 @@ def collect_and_split_data():
         "SOXL": "SOXL_daily",
         "TQQQ": "TQQQ_daily",
         "UPRO": "UPRO_daily",
+        "SQQQ": "SQQQ_daily",
         
         # 기준 지수 (Direct Benchmarks)
         "QQQ": "QQQ_daily",

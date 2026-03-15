@@ -1,46 +1,32 @@
 import torch
-import os
+import torch.optim as optim
 
-def train_risk_parameters(model, train_dataset, config):
-    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    model.to(device)
-    # 리스크 파라미터들만 최적화
-    optimizer = torch.optim.Adam(model.parameters(), lr=config['train']['learning_rate'])
-    
-    print(f"🚀 [2단계] 리스크 관리 최적화 시작...")
+class StrategyTrainerStep2:
+    def __init__(self, model, lr=0.005):
+        self.model = model
+        # 2단계는 가중치 빼고 나머지 파라미터(Thresh 등)만 학습
+        params = [p for n, p in model.named_parameters() if "stock_weights" not in n]
+        self.optimizer = optim.Adam(params, lr=lr)
 
-    for epoch in range(config['train']['epochs']):
-        model.train()
-        entry_price, holding = 0.0, False
-        epoch_strat_returns = []
-        prev_signal = torch.tensor([0.0], device=device, requires_grad=True)
-
-        for i in range(1, len(train_dataset)):
-            curr_feat, target_ret = train_dataset[i]
-            prev_feat, _ = train_dataset[i-1]
-            curr_price = train_dataset.df['Close'].iloc[i]
-
-            current_ret = (curr_price - entry_price) / entry_price if holding else 0.0
-            signal = model(curr_feat.to(device).unsqueeze(0), 
-                           prev_feat.to(device).unsqueeze(0), 
-                           torch.tensor([current_ret], device=device).float())
+    def train_epoch(self, dataset):
+        self.model.train()
+        self.optimizer.zero_grad()
+        
+        total_returns = []
+        for i in range(1, len(dataset)):
+            curr_feat, ret = dataset[i]
+            prev_feat, _ = dataset[i-1]
             
-            # 미분 가능한 수익률 계산
-            epoch_strat_returns.append(prev_signal * target_ret.to(device))
-
-            if not holding and signal.item() > 0.5:
-                holding, entry_price = True, curr_price
-            elif holding and signal.item() < 0.5:
-                holding, entry_price = False, 0.0
+            signal = self.model(curr_feat.unsqueeze(0), prev_feat.unsqueeze(0), torch.tensor([0.0]))
             
-            prev_signal = signal
-
-        if len(epoch_strat_returns) > 1:
-            all_rets = torch.cat(epoch_strat_returns)
-            loss = -(torch.mean(all_rets) / (torch.std(all_rets) + 1e-8))
-            optimizer.zero_grad(); loss.backward(); optimizer.step()
-
-        if (epoch + 1) % 10 == 0:
-            print(f"Epoch [{epoch+1}] Loss: {loss.item():.4f} | SL: {model.stop_loss_threshold.item():.4f} | TP: {model.take_profit_threshold.item():.4f}")
-
-    torch.save({'state_dict': model.state_dict()}, 'saved/checkpoint_step2.pth')
+            # 미분 가능한 포지션 결정 (Long-Short 스위칭 유도)
+            pos = torch.tanh(10.0 * (signal - 0.5)) 
+            total_returns.append(pos * ret)
+            
+        returns_tensor = torch.stack(total_returns)
+        sharpe = returns_tensor.mean() / (returns_tensor.std() + 1e-6)
+        
+        loss = -sharpe
+        loss.backward()
+        self.optimizer.step()
+        return loss.item()
