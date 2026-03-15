@@ -33,7 +33,7 @@ def collect_all_finance_data():
     for ticker, filename in target_dict.items():
         try:
             print(f"📦 {ticker} 수집 중...", end=" ", flush=True)
-            df = yf.download(ticker, period="2y", progress=False)
+            df = yf.download(ticker, period="10y", progress=False)
             
             if df.empty:
                 print("❌ 실패")
