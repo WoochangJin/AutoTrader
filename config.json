@@ -2,7 +2,12 @@
     "strategy": {
         "name": "MultiMaFilterStrategy",
         "params": {
-            "ma_windows": [5, 20, 60, 200],
+            "ma_windows": [
+                5,
+                20,
+                60,
+                200
+            ],
             "rsi_buy_level": 35.5,
             "rsi_sell_level": 75.0,
             "vol_ma_window": 20,
@@ -10,5 +15,11 @@
             "stop_loss_pct": -5.0,
             "trailing_stop_pct": 3.5
         }
+    },
+    "model_training": {
+        "target_ticker": "TQQQ",
+        "lr": 0.001,
+        "epochs": 100,
+        "batch_size": 64
     }
 }
