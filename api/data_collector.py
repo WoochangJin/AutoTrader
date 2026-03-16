@@ -4,16 +4,19 @@ import os
 from datetime import datetime
 
 def collect_all_finance_data():
-    # 1. 경로 설정: 현재 파일(api/data_collector.py)의 부모 폴더(루트)에 data 폴더 지정
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(current_dir)
-    save_dir = os.path.join(root_dir, "data") # 프로젝트 루트/data
     
-    if not os.path.exists(save_dir):
-        os.makedirs(save_dir)
-        print(f"📂 '{save_dir}' 폴더가 생성되었습니다.")
+    # 📍 폴더 구조 세분화
+    base_save_dir = os.path.join(root_dir, "data")
+    train_dir = os.path.join(base_save_dir, "train")
+    test_dir = os.path.join(base_save_dir, "test")
+    
+    for d in [train_dir, test_dir]:
+        if not os.path.exists(d):
+            os.makedirs(d)
+            print(f"📂 '{d}' 폴더가 생성되었습니다.")
 
-    # 2. 수집 대상 정의
     target_dict = {
         "SOXL": "SOXL_daily",
         "TQQQ": "TQQQ_daily",
@@ -27,7 +30,7 @@ def collect_all_finance_data():
         "DX-Y.NYB": "DXY_daily"
     }
 
-    print(f"🚀 총 {len(target_dict)}개 데이터 수집 시작 (루트/data 폴더 저장)")
+    print(f"🚀 데이터 수집 및 Train/Test 분리 시작")
     print("-" * 50)
 
     for ticker, filename in target_dict.items():
@@ -39,19 +42,27 @@ def collect_all_finance_data():
                 print("❌ 실패")
                 continue
 
+            # 기초 지표 계산 (이후 모델에서 쓸 feature)
             df['MA200'] = df['Close'].rolling(window=200).mean()
             df['MA60'] = df['Close'].rolling(window=60).mean()
+            df = df.dropna() # 앞부분 빈 데이터 제거
+
+            # 📍 8:2 비율로 Train/Test 분리 (시계열 순서 유지)
+            split_idx = int(len(df) * 0.8)
+            train_df = df.iloc[:split_idx]
+            test_df = df.iloc[split_idx:]
+
+            # 각각 저장
+            train_df.to_csv(os.path.join(train_dir, f"{filename}.csv"))
+            test_df.to_csv(os.path.join(test_dir, f"{filename}.csv"))
             
-            # 저장 경로 적용
-            file_path = os.path.join(save_dir, f"{filename}.csv")
-            df.to_csv(file_path)
-            print(f"✅ 저장 완료")
+            print(f"✅ 완료 (Train: {len(train_df)}일, Test: {len(test_df)}일)")
 
         except Exception as e:
             print(f"❌ 에러: {e}")
 
     print("-" * 50)
-    print("✨ 모든 데이터 수집 및 'data' 폴더 저장 완료!")
+    print("✨ 모든 데이터 분리 저장 완료!")
 
 if __name__ == "__main__":
     collect_all_finance_data()
