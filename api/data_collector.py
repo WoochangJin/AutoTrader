@@ -1,68 +1,72 @@
 import yfinance as yf
 import pandas as pd
 import os
-from datetime import datetime
+import pandas_ta as ta
 
-def collect_all_finance_data():
+def collect_advanced_data():
     current_dir = os.path.dirname(os.path.abspath(__file__))
     root_dir = os.path.dirname(current_dir)
+    save_dir = os.path.join(root_dir, "data")
     
-    # 📍 폴더 구조 세분화
-    base_save_dir = os.path.join(root_dir, "data")
-    train_dir = os.path.join(base_save_dir, "train")
-    test_dir = os.path.join(base_save_dir, "test")
-    
-    for d in [train_dir, test_dir]:
-        if not os.path.exists(d):
-            os.makedirs(d)
-            print(f"📂 '{d}' 폴더가 생성되었습니다.")
+    for d in ["train", "test"]:
+        os.makedirs(os.path.join(save_dir, d), exist_ok=True)
 
-    target_dict = {
-        "SOXL": "SOXL_daily",
-        "TQQQ": "TQQQ_daily",
-        "UPRO": "UPRO_daily",
-        "QQQ": "QQQ_daily",
-        "SPY": "SPY_daily",
-        "^IXIC": "NASDAQ_daily",
-        "KRW=X": "USD_KRW_daily",
-        "^TNX": "US10Y_Yield_daily",
-        "^VIX": "VIX_daily",
-        "DX-Y.NYB": "DXY_daily"
-    }
+    main_tickers = ["TQQQ", "SOXL"]
+    macro_tickers = {"^VIX": "VIX", "^TNX": "US10Y"}
 
-    print(f"🚀 데이터 수집 및 Train/Test 분리 시작")
-    print("-" * 50)
+    print("🚀 고도화 데이터 수집 시작...")
 
-    for ticker, filename in target_dict.items():
+    macro_dfs = {}
+    for ticker, name in macro_tickers.items():
+        print(f"📊 {name} 수집 중...")
+        m_df = yf.download(ticker, period="10y", progress=False)
+        # 📍 Multi-index 방지 및 Close만 추출
+        if isinstance(m_df.columns, pd.MultiIndex):
+            m_df.columns = m_df.columns.get_level_values(0)
+        macro_dfs[name] = m_df['Close']
+
+    for ticker in main_tickers:
         try:
-            print(f"📦 {ticker} 수집 중...", end=" ", flush=True)
+            print(f"📦 {ticker} 및 기술적 지표 계산 중...", end=" ", flush=True)
             df = yf.download(ticker, period="10y", progress=False)
-            
+
+            # 📍 [핵심 수정] Multi-index 컬럼을 단일 레벨로 평탄화
+            if isinstance(df.columns, pd.MultiIndex):
+                df.columns = df.columns.get_level_values(0)
+
+            # 데이터가 비어있는지 확인
             if df.empty:
-                print("❌ 실패")
+                print("❌ 데이터 없음")
                 continue
 
-            # 기초 지표 계산 (이후 모델에서 쓸 feature)
-            df['MA200'] = df['Close'].rolling(window=200).mean()
-            df['MA60'] = df['Close'].rolling(window=60).mean()
-            df = df.dropna() # 앞부분 빈 데이터 제거
+            # 📍 기술적 지표 계산 (ta 활용 전 데이터 타입 명시)
+            df['MA5'] = ta.sma(df['Close'], length=5)
+            df['MA20'] = ta.sma(df['Close'], length=20)
+            df['MA200'] = ta.sma(df['Close'], length=200)
+            df['RSI'] = ta.rsi(df['Close'], length=14)
+            df['CCI'] = ta.cci(df['High'], df['Low'], df['Close'], length=20)
+            df['Vol_ROC'] = df['Volume'].pct_change() * 100
 
-            # 📍 8:2 비율로 Train/Test 분리 (시계열 순서 유지)
+            # 매크로 지표 병합
+            for name, m_series in macro_dfs.items():
+                df = df.join(m_series.rename(name), how='left')
+
+            df = df.dropna()
+            
+            # Train/Test 분리 (8:2)
             split_idx = int(len(df) * 0.8)
             train_df = df.iloc[:split_idx]
             test_df = df.iloc[split_idx:]
 
-            # 각각 저장
-            train_df.to_csv(os.path.join(train_dir, f"{filename}.csv"))
-            test_df.to_csv(os.path.join(test_dir, f"{filename}.csv"))
-            
-            print(f"✅ 완료 (Train: {len(train_df)}일, Test: {len(test_df)}일)")
+            train_df.to_csv(os.path.join(save_dir, "train", f"{ticker}_daily.csv"))
+            test_df.to_csv(os.path.join(save_dir, "test", f"{ticker}_daily.csv"))
+            print(f"✅ 완료")
 
         except Exception as e:
-            print(f"❌ 에러: {e}")
+            print(f"❌ 에러 ({ticker}): {e}")
 
     print("-" * 50)
-    print("✨ 모든 데이터 분리 저장 완료!")
+    print("✨ 데이터 정제 완료!")
 
 if __name__ == "__main__":
-    collect_all_finance_data()
+    collect_advanced_data()

@@ -3,8 +3,8 @@ import matplotlib.pyplot as plt
 import os
 
 def plot_combined_with_tqqq_ma():
-    tqqq_path = "data/TQQQ_daily.csv"
-    dxy_path = "data/DXY_daily.csv"
+    tqqq_path = "data/train/TQQQ_daily.csv"
+    dxy_path = "data/train/DXY_daily.csv"
     
     if not os.path.exists(tqqq_path) or not os.path.exists(dxy_path):
         print("❌ 데이터 파일이 없습니다.")
